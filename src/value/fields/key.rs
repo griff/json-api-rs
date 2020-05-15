@@ -105,19 +105,19 @@ impl FromStr for Key {
                 | '\u{002f}'
                 | '\u{0040}'
                 | '\u{0060}'
-                | '\u{0000}'...'\u{001f}'
-                | '\u{0021}'...'\u{0029}'
-                | '\u{002a}'...'\u{002c}'
-                | '\u{003a}'...'\u{003f}'
-                | '\u{005b}'...'\u{005e}'
-                | '\u{007b}'...'\u{007f}' => {
+                | '\u{0000}'..='\u{001f}'
+                | '\u{0021}'..='\u{0029}'
+                | '\u{002a}'..='\u{002c}'
+                | '\u{003a}'..='\u{003f}'
+                | '\u{005b}'..='\u{005e}'
+                | '\u{007b}'..='\u{007f}' => {
                     bail!("reserved '{}'", value);
                 }
                 '_' | '-' | ' ' if dest.is_empty() => {
                     bail!("cannot start with '{}'", value);
                 }
                 '_' | '-' | ' ' => match chars.peek() {
-                    Some(&'-') | Some(&'_') | Some(&' ') | Some(&'A'...'Z') => {
+                    Some('-') | Some('_') | Some(' ') | Some('A'..='Z') => {
                         continue;
                     }
                     Some(_) => {
@@ -127,10 +127,10 @@ impl FromStr for Key {
                         bail!("cannot end with '{}'", value);
                     }
                 },
-                'A'...'Z' if dest.ends_with('-') => {
+                'A'..='Z' if dest.ends_with('-') => {
                     dest.push(as_lowercase(value));
                 }
-                'A'...'Z' => {
+                'A'..='Z' => {
                     dest.push('-');
                     dest.push(as_lowercase(value));
                 }
