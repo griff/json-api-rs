@@ -1,6 +1,7 @@
 //! Components of a JSON API document.
 
 mod convert;
+mod de;
 mod ident;
 mod link;
 mod object;
@@ -11,14 +12,15 @@ mod error;
 
 use std::iter::FromIterator;
 
+use async_trait::async_trait;
 use serde::de::DeserializeOwned;
 use serde::ser::Serialize;
+use thiserror::Error;
 
-use error::Error;
-use query::Query;
-use sealed::Sealed;
-use value::{Key, Map, Set, Value};
-use view::Render;
+use crate::query::Query;
+use crate::sealed::Sealed;
+use crate::value::{Key, Map, Set, Value};
+use crate::view::{Resolver, ResolveError};
 
 pub use self::convert::*;
 pub use self::error::{ErrorObject, ErrorSource};
@@ -27,12 +29,15 @@ pub use self::link::Link;
 pub use self::object::{NewObject, Object};
 pub use self::relationship::Relationship;
 pub use self::specification::{JsonApi, Version};
+use self::de::DocGraph;
 
 /// A marker trait used to indicate that a type can be the primary data for a
 /// document.
 pub trait PrimaryData: DeserializeOwned + Sealed + Serialize {
     #[doc(hidden)]
-    fn flatten(self, &Set<Object>) -> Value;
+    fn flatten(self, incl: &Set<Object>) -> Value;
+    #[doc(hidden)]
+    fn deserializer<'de>(self, incl: &'de Set<Object>) -> DocGraph<'de>;
 }
 
 /// Represents a compound JSON API document.
@@ -83,18 +88,7 @@ pub enum Document<T: PrimaryData> {
     },
 
     /// Contains 1 or more error(s).
-    Err {
-        errors: Vec<ErrorObject>,
-
-        #[serde(default)]
-        jsonapi: JsonApi,
-
-        #[serde(default, skip_serializing_if = "Map::is_empty")]
-        links: Map<Key, Link>,
-
-        #[serde(default, skip_serializing_if = "Map::is_empty")]
-        meta: Map,
-    },
+    Err(DocumentError),
 }
 
 impl<T: PrimaryData> Document<T> {
@@ -115,10 +109,29 @@ impl<T: PrimaryData> Document<T> {
     }
 }
 
-impl<T: PrimaryData> Render<T> for Document<T> {
-    fn render(self, _: Option<&Query>) -> Result<Document<T>, Error> {
+#[async_trait]
+impl<T> Resolver<T> for Document<T>
+    where T: PrimaryData + Send + Sync
+{
+    type Context = ();
+    async fn resolve(self, _: Option<&Query>, _: &Self::Context) -> Result<Document<T>, ResolveError> {
         Ok(self)
     }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize, Error)]
+#[error("document errors {:?}", .errors)]
+pub struct DocumentError {
+    errors: Vec<ErrorObject>,
+
+    #[serde(default)]
+    jsonapi: JsonApi,
+
+    #[serde(default, skip_serializing_if = "Map::is_empty")]
+    links: Map<Key, Link>,
+
+    #[serde(default, skip_serializing_if = "Map::is_empty")]
+    meta: Map,
 }
 
 /// Describes the data of a document or resource linkage.

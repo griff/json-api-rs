@@ -8,8 +8,10 @@
 //!
 //! [functions exported from the crate root]: ../index.html#functions
 
-mod context;
-mod render;
+mod executor;
+//mod render;
+mod resolver;
 
-pub use self::context::Context;
-pub use self::render::Render;
+pub use self::executor::{Context, Executor};
+//pub use self::render::Render;
+pub use self::resolver::{Resolver, ResolveError};

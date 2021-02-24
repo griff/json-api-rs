@@ -1,16 +1,30 @@
 use async_trait::async_trait;
+use thiserror::Error;
 
 use crate::doc::{Data, Document, PrimaryData};
-use crate::error::Error;
+//use crate::error::Error;
 use crate::query::Query;
+use crate::value::{ParseKeyError, ValueError};
 
-/// A trait to render a given type as a document.
-///
-/// This trait is automatically implemented for any type which implements [`Resource`].
-///
-/// [`Resource`]: ../trait.Resource.html
+
+
+#[derive(Error, Debug)]
+pub enum ResolveError {
+    #[error("parse key error")]
+    ParseKey(#[source] #[from] ParseKeyError),
+    #[error("value error")]
+    Value(#[source] #[from] ValueError),
+    #[error("invalid link URI")]
+    Link(#[source] #[from] http::uri::InvalidUri),
+    #[error("error {0}")]
+    Custom(String)
+}
+
+
 #[async_trait]
-pub trait Render<T: PrimaryData> {
+pub trait Resolver<T: PrimaryData> {
+    type Context;
+
     /// Attempts to render the given type as a document.
     ///
     /// Types that implement the [`Resource`] trait via the [`resource!`] macro can use
@@ -23,18 +37,20 @@ pub trait Render<T: PrimaryData> {
     ///
     /// [`Resource`]: ../trait.Resource.html
     /// [`resource!`]: ../macro.resource.html
-    async fn render(self, query: Option<&Query>) -> Result<Document<T>, Error>;
+    async fn resolve(self, query: Option<&Query>, ctx: &Self::Context) -> Result<Document<T>, ResolveError>;
 }
 
 #[async_trait]
-impl<D, T> Render<D> for Option<T>
+impl<D, T> Resolver<D> for Option<T>
 where
     D: PrimaryData + Send + Sync + 'static,
-    T: Render<D> + Sized + Send + Sync,
+    T: Resolver<D> + Sized + Send + Sync,
+    <T as Resolver<D>>::Context: Send + Sync,
 {
-    async fn render(self, query: Option<&Query>) -> Result<Document<D>, Error> {
+    type Context = T::Context;
+    async fn resolve(self, query: Option<&Query>, ctx: &Self::Context) -> Result<Document<D>, ResolveError> {
         match self {
-            Some(value) => value.render(query).await,
+            Some(value) => value.resolve(query, ctx).await,
             None => Ok(Document::Ok {
                 data: Data::Member(Box::new(None)),
                 included: Default::default(),

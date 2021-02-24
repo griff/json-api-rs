@@ -1,13 +1,15 @@
 use std::cmp::{Eq, PartialEq};
 use std::hash::{Hash, Hasher};
 use std::mem;
+use async_trait::async_trait;
 
-use doc::{Data, Document, Object, PrimaryData};
-use error::Error;
-use query::Query;
-use sealed::Sealed;
-use value::{Key, Map, Set, Value};
-use view::Render;
+use crate::doc::{Data, Document, Object, PrimaryData};
+use crate::query::Query;
+use crate::sealed::Sealed;
+use crate::value::{Key, Map, Set, Value};
+use crate::view::{Resolver, ResolveError};
+
+use super::de::DocGraph;
 
 /// Identifies an individual resource. Commonly found in an object's relationships.
 ///
@@ -58,9 +60,9 @@ impl Identifier {
     /// ```
     /// # extern crate json_api;
     /// #
-    /// # use json_api::Error;
+    /// # use json_api::value::fields::ParseKeyError;
     /// #
-    /// # fn example() -> Result<(), Error> {
+    /// # fn example() -> Result<(), ParseKeyError> {
     /// use json_api::doc::Identifier;
     /// let mut ident = Identifier::new("users".parse()?, "1".to_owned());
     /// # Ok(())
@@ -117,8 +119,10 @@ impl PartialEq<Object> for Identifier {
     }
 }
 
-impl Render<Identifier> for Identifier {
-    fn render(mut self, _: Option<&Query>) -> Result<Document<Identifier>, Error> {
+#[async_trait]
+impl Resolver<Identifier> for Identifier {
+    type Context = ();
+    async fn resolve(mut self, _: Option<&Query>, _: &Self::Context) -> Result<Document<Identifier>, ResolveError> {
         let meta = mem::replace(&mut self.meta, Default::default());
 
         Ok(Document::Ok {
@@ -131,8 +135,10 @@ impl Render<Identifier> for Identifier {
     }
 }
 
-impl Render<Identifier> for Vec<Identifier> {
-    fn render(self, _: Option<&Query>) -> Result<Document<Identifier>, Error> {
+#[async_trait]
+impl Resolver<Identifier> for Vec<Identifier> {
+    type Context = ();
+    async fn resolve(self, _: Option<&Query>, _: &Self::Context) -> Result<Document<Identifier>, ResolveError> {
         Ok(Document::Ok {
             data: Data::Collection(self),
             included: Default::default(),
@@ -149,6 +155,9 @@ impl PrimaryData for Identifier {
             .find(|item| self == **item)
             .map(|item| item.clone().flatten(incl))
             .unwrap_or_else(|| self.id.clone().into())
+    }
+    fn deserializer<'de>(self, included: &'de Set<Object>) -> DocGraph<'de> {
+        DocGraph::id(self, included)
     }
 }
 

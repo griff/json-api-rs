@@ -1,8 +1,7 @@
 use std::mem;
 
-use error::Error;
-use query::{Direction, Page, Query, Sort};
-use value::{Key, Map, Path, Set, Value};
+use crate::query::{Direction, Page, Query, Sort};
+use crate::value::{Key, Map, ParseKeyError, Path, Set, Value};
 
 /// An implementation of the "builder pattern" that can be used to construct a
 /// new query.
@@ -17,7 +16,7 @@ pub struct Builder {
 
 impl Builder {
     /// Attempt to construct a new query from the previously supplied values.
-    pub fn build(&mut self) -> Result<Query, Error> {
+    pub fn build(&mut self) -> Result<Query, ParseKeyError> {
         Ok(Query {
             sort: {
                 self.sort
@@ -26,13 +25,13 @@ impl Builder {
                         let field = field.parse()?;
                         Ok(Sort::new(field, direction))
                     })
-                    .collect::<Result<Set<Sort>, Error>>()?
+                    .collect::<Result<Set<Sort>, ParseKeyError>>()?
             },
             filter: {
                 self.filter
                     .drain(..)
                     .map(|(key, value)| Ok((key.parse()?, value)))
-                    .collect::<Result<Map<Path, Value>, Error>>()?
+                    .collect::<Result<Map<Path, Value>, ParseKeyError>>()?
             },
             fields: {
                 self.fields
@@ -42,17 +41,17 @@ impl Builder {
                         let value = value
                             .drain(..)
                             .map(|item| item.parse())
-                            .collect::<Result<Set, Error>>()?;
+                            .collect::<Result<Set, ParseKeyError>>()?;
 
                         Ok((key, value))
                     })
-                    .collect::<Result<Map<Key, Set>, Error>>()?
+                    .collect::<Result<Map<Key, Set>, ParseKeyError>>()?
             },
             include: {
                 self.include
                     .drain(..)
                     .map(|value| value.parse())
-                    .collect::<Result<Set<Path>, Error>>()?
+                    .collect::<Result<Set<Path>, ParseKeyError>>()?
             },
             page: mem::replace(&mut self.page, None),
             _ext: (),

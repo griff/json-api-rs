@@ -5,9 +5,14 @@ use std::str::FromStr;
 
 use serde::de::{self, Deserialize, Deserializer, Visitor};
 use serde::ser::{Serialize, Serializer};
+use thiserror::Error;
 
-use error::Error;
-use sealed::Sealed;
+//use crate::error::Error;
+use crate::sealed::Sealed;
+
+#[derive(Error, Debug)]
+#[error(r#"Could no parse key '{0}': {1}"#)]
+pub struct ParseKeyError(String, String);
 
 /// Represents a single member name.
 ///
@@ -21,10 +26,9 @@ use sealed::Sealed;
 /// #
 /// # use std::str::FromStr;
 /// #
-/// # use json_api::Error;
-/// # use json_api::value::Key;
+/// # use json_api::value::{Key, ParseKeyError};
 /// #
-/// # fn example() -> Result<(), Error> {
+/// # fn example() -> Result<(), ParseKeyError> {
 /// let key = Key::from_str("someFieldName")?;
 /// assert_eq!(key, "some-field-name");
 /// #
@@ -86,11 +90,11 @@ impl From<Key> for String {
 }
 
 impl FromStr for Key {
-    type Err = Error;
+    type Err = ParseKeyError;
 
     fn from_str(source: &str) -> Result<Key, Self::Err> {
         if source.is_empty() {
-            bail!("cannot be blank");
+            return Err(ParseKeyError(source.to_string(), "cannot be blank".to_string()));
         }
 
         // We should reserve a bit more than what we need so in
@@ -111,10 +115,10 @@ impl FromStr for Key {
                 | '\u{003a}'..='\u{003f}'
                 | '\u{005b}'..='\u{005e}'
                 | '\u{007b}'..='\u{007f}' => {
-                    bail!("reserved '{}'", value);
+                    return Err(ParseKeyError(source.to_string(), format!("reserved '{}'", value)));
                 }
                 '_' | '-' | ' ' if dest.is_empty() => {
-                    bail!("cannot start with '{}'", value);
+                    return Err(ParseKeyError(source.to_string(), format!("cannot start with '{}'", value)));
                 }
                 '_' | '-' | ' ' => match chars.peek() {
                     Some('-') | Some('_') | Some(' ') | Some('A'..='Z') => {
@@ -124,7 +128,7 @@ impl FromStr for Key {
                         dest.push('-');
                     }
                     None => {
-                        bail!("cannot end with '{}'", value);
+                        return Err(ParseKeyError(source.to_string(), format!("cannot end with '{}'", value)));
                     }
                 },
                 'A'..='Z' if dest.ends_with('-') => {

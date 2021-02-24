@@ -12,8 +12,8 @@ use ordermap::{self, OrderMap};
 use serde::de::{Deserialize, Deserializer};
 use serde::ser::{Serialize, Serializer};
 
-use value::collections::Equivalent;
-use value::{Key, Value};
+use crate::value::collections::Equivalent;
+use crate::value::{Key, Value};
 
 /// A hash map implementation with consistent ordering.
 #[derive(Clone, Eq, PartialEq)]
@@ -51,10 +51,9 @@ where
     /// ```
     /// # extern crate json_api;
     /// #
-    /// # use json_api::Error;
     /// # use json_api::value::Map;
     /// #
-    /// # fn example() -> Result<(), Error> {
+    /// # fn example() {
     /// let mut map = Map::with_capacity(2);
     ///
     /// map.insert("x", 1);
@@ -63,11 +62,10 @@ where
     /// // The next insert will likely require reallocation...
     /// map.insert("z", 3);
     /// #
-    /// # Ok(())
     /// # }
     /// #
     /// # fn main() {
-    /// #     example().unwrap();
+    /// #     example();
     /// # }
     /// ```
     pub fn with_capacity(capacity: usize) -> Self {

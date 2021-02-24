@@ -1,13 +1,14 @@
 use std::cmp::{Eq, PartialEq};
 use std::hash::{Hash, Hasher};
 use std::mem;
+use async_trait::async_trait;
 
-use doc::{Data, Document, Identifier, Link, PrimaryData, Relationship};
-use error::Error;
-use query::Query;
-use sealed::Sealed;
-use value::{Key, Map, Set, Value};
-use view::Render;
+use crate::doc::{Data, Document, Identifier, Link, PrimaryData, Relationship};
+use crate::doc::de::DocGraph;
+use crate::query::Query;
+use crate::sealed::Sealed;
+use crate::value::{Key, Map, Set, Value};
+use crate::view::{Resolver, ResolveError};
 
 /// A preexisting resource. Commonly found in the document of a response or `PATCH`
 /// request.
@@ -24,9 +25,9 @@ use view::Render;
 /// ```
 /// # extern crate json_api;
 /// #
-/// # use json_api::Error;
+/// # use json_api::value::fields::ParseKeyError;
 /// #
-/// # fn example() -> Result<(), Error> {
+/// # fn example() -> Result<(), ParseKeyError> {
 /// use json_api::doc::Object;
 /// use json_api::value::Key;
 ///
@@ -62,9 +63,9 @@ use view::Render;
 /// ```
 /// # extern crate json_api;
 /// #
-/// # use json_api::Error;
+/// # use json_api::value::fields::ParseKeyError;
 /// #
-/// # fn example() -> Result<(), Error> {
+/// # fn example() -> Result<(), ParseKeyError> {
 /// # use json_api::doc::Object;
 /// # use json_api::value::Key;
 /// #
@@ -95,9 +96,9 @@ use view::Render;
 /// ```
 /// # extern crate json_api;
 /// #
-/// # use json_api::Error;
+/// # use json_api::value::fields::ParseKeyError;
 /// #
-/// # fn example() -> Result<(), Error> {
+/// # fn example() -> Result<(), ParseKeyError> {
 /// use json_api::doc::Object;
 /// use json_api::value::{Key, Set};
 ///
@@ -203,9 +204,9 @@ impl Object {
     /// ```
     /// # extern crate json_api;
     /// #
-    /// # use json_api::Error;
+    /// # use json_api::value::fields::ParseKeyError;
     /// #
-    /// # fn example() -> Result<(), Error> {
+    /// # fn example() -> Result<(), ParseKeyError> {
     /// use json_api::doc::Object;
     /// let mut obj = Object::new("users".parse()?, "1".to_owned());
     /// # Ok(())
@@ -249,14 +250,18 @@ impl PartialEq<Identifier> for Object {
     }
 }
 
-impl Render<Identifier> for Object {
-    fn render(self, query: Option<&Query>) -> Result<Document<Identifier>, Error> {
-        Identifier::from(self).render(query)
+#[async_trait]
+impl Resolver<Identifier> for Object {
+    type Context = ();
+    async fn resolve(self, query: Option<&Query>, ctx: &Self::Context) -> Result<Document<Identifier>, ResolveError> {
+        Identifier::from(self).resolve(query, ctx).await
     }
 }
 
-impl Render<Identifier> for Vec<Object> {
-    fn render(self, _: Option<&Query>) -> Result<Document<Identifier>, Error> {
+#[async_trait]
+impl Resolver<Identifier> for Vec<Object> {
+    type Context = ();
+    async fn resolve(self, _: Option<&Query>, _: &Self::Context) -> Result<Document<Identifier>, ResolveError> {
         let data = self.into_iter().map(Identifier::from).collect();
 
         Ok(Document::Ok {
@@ -269,8 +274,10 @@ impl Render<Identifier> for Vec<Object> {
     }
 }
 
-impl Render<Object> for Object {
-    fn render(mut self, _: Option<&Query>) -> Result<Document<Object>, Error> {
+#[async_trait]
+impl Resolver<Object> for Object {
+    type Context = ();
+    async fn resolve(mut self, _: Option<&Query>, _: &Self::Context) -> Result<Document<Object>, ResolveError> {
         let links = mem::replace(&mut self.links, Default::default());
         let meta = mem::replace(&mut self.meta, Default::default());
 
@@ -284,8 +291,10 @@ impl Render<Object> for Object {
     }
 }
 
-impl Render<Object> for Vec<Object> {
-    fn render(self, _: Option<&Query>) -> Result<Document<Object>, Error> {
+#[async_trait]
+impl Resolver<Object> for Vec<Object> {
+    type Context = ();
+    async fn resolve(self, _: Option<&Query>, _: &Self::Context) -> Result<Document<Object>, ResolveError> {
         Ok(Document::Ok {
             data: Data::Collection(self),
             included: Default::default(),
@@ -309,21 +318,27 @@ impl PrimaryData for Object {
         map.extend(attributes);
 
         for (key, value) in relationships {
-            let value = match value.data {
-                Data::Member(data) => match *data {
-                    Some(item) => item.flatten(incl),
-                    None => Value::Null,
-                },
-                Data::Collection(data) => {
-                    let iter = data.into_iter().map(|item| item.flatten(incl));
-                    Value::Array(iter.collect())
-                }
-            };
-
-            map.insert(key, value);
+            if let Some(value) = value.data {
+                let value = match value {
+                    Data::Member(data) => match *data {
+                        Some(item) => item.flatten(incl),
+                        None => Value::Null,
+                    },
+                    Data::Collection(data) => {
+                        let iter = data.into_iter().map(|item| item.flatten(incl));
+                        Value::Array(iter.collect())
+                    }
+                };
+    
+                map.insert(key, value);
+            }
         }
 
         Value::Object(map)
+    }
+
+    fn deserializer<'de>(self, included: &'de Set<Object>) -> DocGraph<'de> {
+        DocGraph::object(self, included)
     }
 }
 
@@ -401,9 +416,9 @@ impl NewObject {
     /// ```
     /// # extern crate json_api;
     /// #
-    /// # use json_api::Error;
+    /// # use json_api::value::fields::ParseKeyError;
     /// #
-    /// # fn example() -> Result<(), Error> {
+    /// # fn example() -> Result<(), ParseKeyError> {
     /// use json_api::doc::NewObject;
     /// let mut obj = NewObject::new("users".parse()?);
     /// # Ok(())
@@ -442,23 +457,31 @@ impl PrimaryData for NewObject {
         map.extend(attributes);
 
         for (key, value) in relationships {
-            let value = match value.data {
-                Data::Member(data) => match *data {
-                    Some(Identifier { id, .. }) => Value::String(id),
-                    None => Value::Null,
-                },
-                Data::Collection(data) => data.into_iter().map(|ident| ident.id).collect(),
-            };
-
-            map.insert(key, value);
+            if let Some(value) = value.data {
+                let value = match value {
+                    Data::Member(data) => match *data {
+                        Some(Identifier { id, .. }) => Value::String(id),
+                        None => Value::Null,
+                    },
+                    Data::Collection(data) => data.into_iter().map(|ident| ident.id).collect(),
+                };
+    
+                map.insert(key, value);
+            }
         }
 
         Value::Object(map)
     }
+
+    fn deserializer<'de>(self, included: &'de Set<Object>) -> DocGraph<'de> {
+        DocGraph::new_object(self, included)
+    }
 }
 
-impl Render<NewObject> for NewObject {
-    fn render(self, _: Option<&Query>) -> Result<Document<NewObject>, Error> {
+#[async_trait]
+impl Resolver<NewObject> for NewObject {
+    type Context = ();
+    async fn resolve(self, _: Option<&Query>, _: &Self::Context) -> Result<Document<NewObject>, ResolveError> {
         Ok(Document::Ok {
             data: Data::Member(Box::new(Some(self))),
             included: Default::default(),

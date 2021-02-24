@@ -1,22 +1,42 @@
 //! Functions that convert types to and from a `Value`.
 
-use serde::de::DeserializeOwned;
+use serde::de::{self, DeserializeOwned};
 use serde::ser::Serialize;
 use serde_json::{self, Value as JsonValue};
+use thiserror::Error;
 
-use error::Error;
-use value::Value;
+use crate::value::{Value, ParseKeyError};
+
+#[derive(Error, Debug)]
+pub enum ValueError {
+    #[error("json error {0}")]
+    Json(#[source] #[from] serde_json::Error),
+    #[error("parse key error {0}")]
+    ParseKey(#[source] #[from] ParseKeyError),
+}
+
+impl serde::de::Error for ValueError {
+    fn custom<T>(msg: T) -> Self
+        where T: std::fmt::Display
+    {
+        ValueError::Json(serde_json::Error::custom(msg))
+    }
+
+    fn invalid_type(unexp: de::Unexpected, exp: &dyn de::Expected) -> Self {
+        ValueError::Json(serde_json::Error::invalid_type(unexp, exp))
+    }
+}
 
 /// Convert a `T` into a `Value`.
-pub fn to_value<T>(value: T) -> Result<Value, Error>
+pub fn to_value<T>(value: T) -> Result<Value, ValueError>
 where
     T: Serialize,
 {
-    from_json(serde_json::to_value(value)?)
+    Ok(from_json(serde_json::to_value(value)?)?)
 }
 
 /// Interpret a `Value` as a type `T`.
-pub fn from_value<T>(value: Value) -> Result<T, Error>
+pub fn from_value<T>(value: Value) -> Result<T, serde_json::Error>
 where
     T: DeserializeOwned,
 {
@@ -41,7 +61,7 @@ pub(crate) fn to_json(value: Value) -> JsonValue {
     }
 }
 
-pub(crate) fn from_json(value: JsonValue) -> Result<Value, Error> {
+pub(crate) fn from_json(value: JsonValue) -> Result<Value, ParseKeyError> {
     match value {
         JsonValue::Null => Ok(Value::Null),
         JsonValue::Array(data) => data.into_iter().map(from_json).collect(),

@@ -2,13 +2,13 @@ extern crate json_api;
 #[macro_use]
 extern crate ordermap;
 
-use json_api::Error;
 use json_api::query::{self, Direction, Query};
+use json_api::value::ParseKeyError;
 use ordermap::OrderMap;
 
 type Mapping = OrderMap<&'static str, Query>;
 
-fn from_mapping() -> Result<Mapping, Error> {
+fn from_mapping() -> Result<Mapping, ParseKeyError> {
     Ok(ordermap!{
         "" => Default::default(),
         "fields%5Barticles%5D=title" => Query::builder()
@@ -82,7 +82,7 @@ fn from_mapping() -> Result<Mapping, Error> {
     })
 }
 
-fn to_mapping() -> Result<Mapping, Error> {
+fn to_mapping() -> Result<Mapping, ParseKeyError> {
     let mapping = from_mapping()?
         .into_iter()
         .map(|(key, value)| match key {

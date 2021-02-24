@@ -8,9 +8,9 @@ use std::str::FromStr;
 use serde::de::{Deserialize, Deserializer};
 use serde::ser::{Serialize, Serializer};
 
-use error::Error;
-use sealed::Sealed;
-use value::Key;
+//use crate::error::Error;
+use crate::sealed::Sealed;
+use super::{Key, ParseKeyError};
 
 /// Represents a dot-separated list of member names.
 ///
@@ -33,10 +33,10 @@ impl Path {
     /// ```
     /// # extern crate json_api;
     /// #
-    /// # use json_api::Error;
+    /// # use json_api::value::fields::ParseKeyError;
     /// # use json_api::value::Path;
     /// #
-    /// # fn example() -> Result<(), Error> {
+    /// # fn example() -> Result<(), ParseKeyError> {
     /// let mut path = Path::with_capacity(2);
     ///
     /// path.push("a".parse()?);
@@ -83,10 +83,10 @@ impl Path {
     /// #
     /// # use std::str::FromStr;
     /// #
-    /// # use json_api::Error;
+    /// # use json_api::value::fields::ParseKeyError;
     /// # use json_api::value::Path;
     /// #
-    /// # fn example() -> Result<(), Error> {
+    /// # fn example() -> Result<(), ParseKeyError> {
     /// let path = Path::from_str("authors.name")?;
     ///
     /// assert_eq!(path.len(), 2);
@@ -121,10 +121,10 @@ impl Path {
     /// #
     /// # use std::str::FromStr;
     /// #
-    /// # use json_api::Error;
+    /// # use json_api::value::fields::ParseKeyError;
     /// # use json_api::value::Path;
     /// #
-    /// # fn example() -> Result<(), Error> {
+    /// # fn example() -> Result<(), ParseKeyError> {
     /// let mut path = Path::from_str("authors.name")?;
     ///
     /// assert_eq!(path.pop(), Some("name".parse()?));
@@ -149,10 +149,10 @@ impl Path {
     /// ```
     /// # extern crate json_api;
     /// #
-    /// # use json_api::Error;
+    /// # use json_api::value::fields::ParseKeyError;
     /// # use json_api::value::Path;
     /// #
-    /// # fn example() -> Result<(), Error> {
+    /// # fn example() -> Result<(), ParseKeyError> {
     /// let mut path = Path::new();
     ///
     /// path.push("authors".parse()?);
@@ -230,10 +230,10 @@ impl Path {
     /// ```
     /// # extern crate json_api;
     /// #
-    /// # use json_api::Error;
+    /// # use json_api::value::fields::ParseKeyError;
     /// # use json_api::value::Path;
     /// #
-    /// # fn example() -> Result<(), Error> {
+    /// # fn example() -> Result<(), ParseKeyError> {
     /// let mut path = Path::with_capacity(10);
     ///
     /// path.push("authors".parse()?);
@@ -320,7 +320,7 @@ impl FromIterator<Key> for Path {
 }
 
 impl FromStr for Path {
-    type Err = Error;
+    type Err = ParseKeyError;
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         value.split('.').map(Key::from_str).collect()
@@ -416,9 +416,9 @@ pub trait Segment<T> {
     /// ```
     /// # extern crate json_api;
     /// #
-    /// # use json_api::Error;
+    /// # use json_api::value::fields::ParseKeyError;
     /// #
-    /// # fn example() -> Result<(), Error> {
+    /// # fn example() -> Result<(), ParseKeyError> {
     /// use json_api::value::fields::{Key, Path, Segment};
     ///
     /// let posts = "posts".parse::<Key>()?;

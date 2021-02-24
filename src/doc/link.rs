@@ -4,12 +4,11 @@ use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::str::FromStr;
 
-use http::Uri;
+use http::uri::{Uri, InvalidUri};
 use serde::de::{self, Deserialize, Deserializer, MapAccess, Visitor};
 use serde::ser::{Serialize, SerializeStruct, Serializer};
 
-use error::Error;
-use value::Map;
+use crate::value::Map;
 
 /// A data structure containing a URL. Can be deserialized from either a string or link
 /// object.
@@ -21,9 +20,9 @@ use value::Map;
 /// ```
 /// # extern crate json_api;
 /// #
-/// # use json_api::Error;
+/// # use http::uri::InvalidUri;
 /// #
-/// # fn example() -> Result<(), Error> {
+/// # fn example() -> Result<(), InvalidUri> {
 /// use json_api::doc::Link;
 /// "https://rust-lang.org".parse::<Link>()?;
 /// # Ok(())
@@ -69,7 +68,7 @@ impl Display for Link {
 impl Eq for Link {}
 
 impl FromStr for Link {
-    type Err = Error;
+    type Err = InvalidUri;
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         Ok(Link {

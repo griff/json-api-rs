@@ -10,9 +10,9 @@ use percent_encoding::percent_decode;
 use serde::de::{Deserialize, Deserializer, MapAccess, Visitor};
 use serde::ser::{Serialize, SerializeStruct, Serializer};
 use serde_qs;
+use thiserror::Error;
 
-use error::Error;
-use value::{Key, Map, Path, Set, Value};
+use crate::value::{Key, Map, ParseKeyError, Path, Set, Value};
 
 pub use self::builder::Builder;
 pub use self::page::Page;
@@ -215,19 +215,29 @@ impl Serialize for Query {
     }
 }
 
+#[derive(Error, Debug)]
+pub enum QueryError {
+    #[error("bad query string {0}")]
+    QueryString(#[source] #[from] serde_qs::Error),
+    #[error("bad UTF-8 {0}")]
+    Utf8(#[source] #[from] std::str::Utf8Error),
+    #[error("bad key {0}")]
+    ParseKey(#[source] #[from] ParseKeyError),
+}
+
 /// Deserialize a `Query` from the bytes of a percent encoded query string.
-pub fn from_slice(data: &[u8]) -> Result<Query, Error> {
+pub fn from_slice(data: &[u8]) -> Result<Query, QueryError> {
     let value = percent_decode(data).decode_utf8()?;
     Ok(serde_qs::from_bytes(value.as_bytes())?)
 }
 
 /// Deserialize a `Query` from a percent encoded query string.
-pub fn from_str(data: &str) -> Result<Query, Error> {
+pub fn from_str(data: &str) -> Result<Query, QueryError> {
     from_slice(data.as_bytes())
 }
 
 /// Serialize the given `Query` as a percent encoded query string.
-pub fn to_string(query: &Query) -> Result<String, Error> {
+pub fn to_string(query: &Query) -> Result<String, QueryError> {
     use percent_encoding::{percent_encode, QUERY_ENCODE_SET};
 
     let value = serde_qs::to_string(query)?;
@@ -238,6 +248,6 @@ pub fn to_string(query: &Query) -> Result<String, Error> {
 
 /// Serialize the given `Query` as a representing percent encoded query string
 /// vector of bytes.
-pub fn to_vec(query: &Query) -> Result<Vec<u8>, Error> {
+pub fn to_vec(query: &Query) -> Result<Vec<u8>, QueryError> {
     to_string(query).map(Vec::from)
 }

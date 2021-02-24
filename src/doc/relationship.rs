@@ -1,7 +1,7 @@
 use std::iter::FromIterator;
 
-use doc::{Data, Identifier, Link};
-use value::{Key, Map};
+use crate::doc::{Data, Identifier, Link};
+use crate::value::{Key, Map};
 
 /// Represents a resource's relationship to another.
 ///
@@ -15,7 +15,8 @@ pub struct Relationship {
     /// *[resource linkage]* section of the JSON API specification.
     ///
     /// [resource linkage]: https://goo.gl/evZF8m
-    pub data: Data<Identifier>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub data: Option<Data<Identifier>>,
 
     /// Contains relevant links. If this value of this field is empty, it will not be
     /// serialized. For more information, check out the *[links]* section of the JSON
@@ -46,14 +47,14 @@ impl Relationship {
     /// ```
     /// # extern crate json_api;
     /// #
-    /// # use json_api::Error;
+    /// # use json_api::value::fields::ParseKeyError;
     /// #
-    /// # fn example() -> Result<(), Error> {
+    /// # fn example() -> Result<(), ParseKeyError> {
     /// use json_api::doc::{Data, Identifier, Relationship};
     ///
     /// let ident = Identifier::new("users".parse()?, "1".to_owned());
     /// let data = Data::Member(Box::new(Some(ident)));
-    /// let mut relationship = Relationship::new(data);
+    /// let mut relationship = Relationship::new(Some(data));
     /// # Ok(())
     /// # }
     /// #
@@ -61,9 +62,9 @@ impl Relationship {
     /// # example().unwrap();
     /// # }
     /// ```
-    pub fn new(data: Data<Identifier>) -> Self {
+    pub fn new(data: Option<Data<Identifier>>) -> Self {
         Relationship {
-            data,
+            data: data,
             links: Default::default(),
             meta: Default::default(),
             _ext: (),
@@ -74,14 +75,14 @@ impl Relationship {
 impl From<Option<Identifier>> for Relationship {
     fn from(value: Option<Identifier>) -> Self {
         let data = Data::Member(Box::new(value));
-        Relationship::new(data)
+        Relationship::new(Some(data))
     }
 }
 
 impl From<Vec<Identifier>> for Relationship {
     fn from(value: Vec<Identifier>) -> Self {
         let data = Data::Collection(value);
-        Relationship::new(data)
+        Relationship::new(Some(data))
     }
 }
 
@@ -97,6 +98,6 @@ impl FromIterator<Identifier> for Relationship {
         I: IntoIterator<Item = Identifier>,
     {
         let data = Data::from_iter(iter);
-        Relationship::new(data)
+        Relationship::new(Some(data))
     }
 }

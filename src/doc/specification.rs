@@ -3,9 +3,9 @@ use std::str::FromStr;
 
 use serde::de::{Deserialize, Deserializer, Error as DeError};
 use serde::ser::{Serialize, Serializer};
+use thiserror::Error;
 
-use error::Error;
-use value::Map;
+use crate::value::Map;
 
 /// Information about this implementation of the specification.
 ///
@@ -54,6 +54,10 @@ impl JsonApi {
     }
 }
 
+#[derive(Error, Debug)]
+#[error(r#"Version "{0}" is not yet supported by this implementation."#)]
+pub struct UnsupportedVersionError(String);
+
 /// The version of the specification.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum Version {
@@ -76,12 +80,12 @@ impl Display for Version {
 }
 
 impl FromStr for Version {
-    type Err = Error;
+    type Err = UnsupportedVersionError;
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
             "1.0" => Ok(Version::V1),
-            v => Err(Error::unsupported_version(v)),
+            v => Err(UnsupportedVersionError(v.to_string())),
         }
     }
 }

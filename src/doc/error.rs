@@ -1,6 +1,6 @@
-use doc::Link;
+use crate::doc::Link;
 use http::StatusCode;
-use value::{Key, Map};
+use crate::value::{Key, Map};
 
 /// Contains information about problems encountered while performing an
 /// operation.

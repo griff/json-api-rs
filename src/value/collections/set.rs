@@ -10,11 +10,11 @@ use std::str::FromStr;
 use serde::de::{Deserialize, Deserializer, SeqAccess, Visitor};
 use serde::ser::{Serialize, SerializeSeq, Serializer};
 
-use error::Error;
-use sealed::Sealed;
-use value::Key;
-use value::collections::Equivalent;
-use value::collections::map::{self, Keys, Map};
+//use crate::error::Error;
+use crate::sealed::Sealed;
+use crate::value::Key;
+use crate::value::collections::Equivalent;
+use crate::value::collections::map::{self, Keys, Map};
 
 /// A hash set implemented as a `Map` where the value is `()`.
 #[derive(Clone, Eq, PartialEq)]
@@ -46,10 +46,9 @@ impl<T: Eq + Hash> Set<T> {
     /// ```
     /// # extern crate json_api;
     /// #
-    /// # use json_api::Error;
     /// # use json_api::value::Set;
     /// #
-    /// # fn example() -> Result<(), Error> {
+    /// # fn example() {
     /// let mut set = Set::with_capacity(2);
     ///
     /// set.insert("x");
@@ -58,11 +57,10 @@ impl<T: Eq + Hash> Set<T> {
     /// // The next insert will likely require reallocation...
     /// set.insert("z");
     /// #
-    /// # Ok(())
     /// # }
     /// #
     /// # fn main() {
-    /// #     example().unwrap();
+    /// #     example();
     /// # }
     /// ```
     pub fn with_capacity(capacity: usize) -> Self {
@@ -366,9 +364,8 @@ impl<T: Eq + Hash> FromIterator<T> for Set<T> {
 impl<T, E> FromStr for Set<T>
 where
     T: Eq + FromStr<Err = E> + Hash,
-    E: Into<Error>,
 {
-    type Err = Error;
+    type Err = T::Err;
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         let iter = value.split(',');
